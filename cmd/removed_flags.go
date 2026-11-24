@@ -90,10 +90,10 @@ const (
 	errInitTemplateRemoved = "astro init has no templates; it writes one starter project with an example Dag in dags/"
 	errInitRuntimeRemoved  = "a project pins Airflow, with --airflow-version or the apache-airflow requirement in pyproject.toml, " +
 		"and Docker mode builds on the newest Astro Runtime for it. To pin one Runtime build, set runtime = \"<version>\" under [tool.astro] in pyproject.toml"
-	errInitRemoteExecRemoved = "astro init writes no client image files. " +
-		"To deploy a client image for remote execution, add a Dockerfile.client to the project and use astro remote deploy"
-	errInitRemoteRepoRemoved = "set the repository astro remote deploy pushes the client image to as " +
-		"client-registry under [tool.astro.deploy] in pyproject.toml, or pass astro remote deploy --registry <registry>/<repository>"
+	errInitRemoteExecRemoved = "astro init writes no agent image files. " +
+		"To deploy an agent image for remote execution, add a Dockerfile.client to the project and use astro remote deploy"
+	errInitRemoteRepoRemoved = "set the repository astro remote deploy pushes the agent image to as " +
+		"agent-registry under [tool.astro.deploy] in pyproject.toml, or pass astro remote deploy --registry <registry>/<repository>"
 	errInitACRemoved = "a project runs Apache Airflow, on Astro Runtime in Docker mode, " +
 		"and there is no Astronomer Certified image to choose. Pin Airflow with --airflow-version"
 	errInitDockerRemoved     = "astro init makes one project for both modes. Choose Docker when you start it, with astro local start --docker"

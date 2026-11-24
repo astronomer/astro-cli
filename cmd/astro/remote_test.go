@@ -15,7 +15,7 @@ import (
 func TestRemoteRootCmd(t *testing.T) {
 	cmd := newRemoteRootCmd(os.Stdout)
 	assert.Equal(t, "remote", cmd.Use)
-	assert.Equal(t, "Manage remote deploys and images", cmd.Short)
+	assert.Equal(t, "Push the image Remote Execution agents run", cmd.Short)
 	assert.True(t, cmd.HasSubCommands())
 
 	// Check that it has the deploy subcommand
@@ -28,15 +28,15 @@ func TestRemoteDeployCmd(t *testing.T) {
 
 	// Test command properties
 	assert.Equal(t, "deploy", cmd.Use)
-	assert.Equal(t, "Deploy a client image to the remote registry", cmd.Short)
-	assert.Contains(t, cmd.Long, "Build and deploy a client image")
+	assert.Equal(t, "Build the agent image and push it to the agents' registry", cmd.Short)
+	assert.Contains(t, cmd.Long, "Build this project's agent image from Dockerfile.client")
 	assert.Contains(t, cmd.Example, "astro remote deploy")
 
 	// Test flags exist
 	platformFlag := cmd.Flags().Lookup("platform")
 	assert.NotNil(t, platformFlag)
 	assert.Equal(t, "", platformFlag.DefValue)
-	assert.Contains(t, platformFlag.Usage, "Target platform for client image build")
+	assert.Contains(t, platformFlag.Usage, "Target platform for agent image build")
 
 	imageNameFlag := cmd.Flags().Lookup("image-name")
 	assert.NotNil(t, imageNameFlag)
@@ -46,7 +46,7 @@ func TestRemoteDeployCmd(t *testing.T) {
 	deploymentFlag := cmd.Flags().Lookup("deployment")
 	assert.NotNil(t, deploymentFlag)
 	assert.Equal(t, "", deploymentFlag.DefValue)
-	assert.Contains(t, deploymentFlag.Usage, "Deployment whose runtime version the client image is validated against")
+	assert.Contains(t, deploymentFlag.Usage, "Deployment whose runtime version the agent image is validated against")
 	assert.True(t, cmd.Flags().Lookup("deployment-id").Hidden, "--deployment-id is 1.x's spelling of --deployment")
 }
 
@@ -263,8 +263,8 @@ func TestRemoteCommandIntegration(t *testing.T) {
 	})
 
 	t.Run("help text is appropriate", func(t *testing.T) {
-		assert.Contains(t, rootCmd.Long, "remote registries")
-		assert.Contains(t, rootCmd.Long, "client images")
+		assert.Contains(t, rootCmd.Long, "Remote Execution")
+		assert.Contains(t, rootCmd.Long, "agent image")
 	})
 
 	t.Run("deploy command includes deployment validation example", func(t *testing.T) {

@@ -185,9 +185,9 @@ func credentialKey(key string) bool {
 	return false
 }
 
-// deployClientRegistry is [tool.astro.deploy] client-registry, the one deploy
+// deployAgentRegistry is [tool.astro.deploy] agent-registry, the one deploy
 // setting that is a string rather than a boolean.
-const deployClientRegistry = "client-registry"
+const deployAgentRegistry = "agent-registry"
 
 // deploySettings1x maps each 1.x CLI setting a project decides to the
 // [tool.astro.deploy] key that holds it now, under every name 1.x wrote it.
@@ -200,8 +200,8 @@ var deploySettings1x = map[string]string{
 	"deploy.cosmos_boost":                     "cosmos-boost",
 	"sha_as_tag":                              "sha-as-tag",
 	"apc.sha_as_tag":                          "sha-as-tag",
-	"remote.client_registry":                  deployClientRegistry,
-	"deploy.remote_execution.client_registry": deployClientRegistry,
+	"remote.client_registry":                  deployAgentRegistry,
+	"deploy.remote_execution.client_registry": deployAgentRegistry,
 }
 
 // carried1x is one 1.x deploy setting the conversion writes into
@@ -258,7 +258,7 @@ func (from1x *project1x) carriedDeploySettings() (carried []carried1x, handled m
 		}
 		var value any
 		switch key {
-		case deployClientRegistry:
+		case deployAgentRegistry:
 			if !plainSettingValue(s.value) {
 				continue
 			}

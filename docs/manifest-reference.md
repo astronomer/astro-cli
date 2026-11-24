@@ -289,13 +289,13 @@ How the project's deploys behave, whoever runs them. These live in the project, 
 
 ```toml
 [tool.astro.deploy]
-client-registry = 'quay.io/acme/client'
+agent-registry = 'quay.io/acme/agent'
 git-metadata = false
 ```
 
-### `client-registry`
+### `agent-registry`
 
-The image repository `astro remote deploy` pushes the Remote Execution client image to: `registry[:port]/repository`, with no tag, since the deploy adds its own. It is the repository the project's remote agents pull from, configured on their side. A link can set its own (see [`client-registry` on a link](#client-registry-1)), and `astro remote deploy --registry` overrides both for one run, which is also the only way to name one outside a project. `astro remote deploy` checks the value is a repository it can push to and names this key when it is not. Astro CLI 1.x kept this as `remote.client_registry`; `astro init` carries it here.
+The image repository `astro remote deploy` pushes the Remote Execution agent image to: `registry[:port]/repository`, with no tag, since the deploy adds its own. It is the repository the project's remote agents pull from, configured on their side. A link can set its own (see [`agent-registry` on a link](#agent-registry-1)), and `astro remote deploy --registry` overrides both for one run, which is also the only way to name one outside a project. `astro remote deploy` checks the value is a repository it can push to and names this key when it is not. Astro CLI 1.x kept this as `remote.client_registry`; `astro init` carries it here.
 
 ### `git-metadata`
 
@@ -377,13 +377,13 @@ Every field that carries a credential is a `*-env` name: it names the environmen
 
 Anything else is an error: an unknown method, a field the method does not take, a missing credential field, half a credential pair, both credential pairs at once.
 
-### `client-registry`
+### `agent-registry`
 
-On an Astro link only: the repository `astro remote deploy --deployment <name>` pushes the client image to, for a Deployment whose remote agents pull from somewhere other than the project's [`client-registry`](#client-registry). Unset, the link takes the project's. An error on any other kind of link, which has no remote agents.
+On an Astro link only: the repository `astro remote deploy --deployment <name>` pushes the agent image to, for a Deployment whose remote agents pull from somewhere other than the project's [`agent-registry`](#agent-registry). Unset, the link takes the project's. An error on any other kind of link, which has no remote agents.
 
 ### `dag-bundle`
 
-On an Astro link only: the named Dag bundle `astro deploy` ships the project's Dags to on this link's Deployment, instead of the Deployment's default bundle. A Dag bundle belongs to one Deployment, so there is no project-wide value to inherit, unlike [`client-registry`](#client-registry-1). `astro deploy --dag-bundle` overrides it for one run. It applies to a deploy that ships Dags (`--dags`, or the full deploy), is not read by `--image`, and the bundle must already exist on the Deployment as a bundle deploys write to (see [A named Dag bundle](deploy.md#a-named-dag-bundle)). An error on any other kind of link, which has no named Dag bundles. A build of the CLI that predates the key warns that it is unknown and deploys to the default bundle, so a teammate on an older CLI ships to a different bundle than the file says.
+On an Astro link only: the named Dag bundle `astro deploy` ships the project's Dags to on this link's Deployment, instead of the Deployment's default bundle. A Dag bundle belongs to one Deployment, so there is no project-wide value to inherit, unlike [`agent-registry`](#agent-registry-1). `astro deploy --dag-bundle` overrides it for one run. It applies to a deploy that ships Dags (`--dags`, or the full deploy), is not read by `--image`, and the bundle must already exist on the Deployment as a bundle deploys write to (see [A named Dag bundle](deploy.md#a-named-dag-bundle)). An error on any other kind of link, which has no named Dag bundles. A build of the CLI that predates the key warns that it is unknown and deploys to the default bundle, so a teammate on an older CLI ships to a different bundle than the file says.
 
 ```toml
 [tool.astro.deployments.prod]

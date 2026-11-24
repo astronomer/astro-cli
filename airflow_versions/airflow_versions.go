@@ -235,7 +235,7 @@ func getAstroAgentTag(clientVersions map[string]ClientVersion, runtimeVersion st
 	}
 
 	if runtimeVersion != "" && !strings.HasPrefix(bestImageTag, runtimeVersion) {
-		fmt.Printf("The selected client image tag %s is the nearest compatible version with the provided runtime version %s\n", bestImageTag, runtimeVersion)
+		fmt.Printf("The selected agent image tag %s is the nearest compatible version with the provided runtime version %s\n", bestImageTag, runtimeVersion)
 	}
 
 	logger.Debugf("Latest image tag: %s", bestImageTag)

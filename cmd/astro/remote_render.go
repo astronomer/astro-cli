@@ -14,7 +14,7 @@ import (
 )
 
 // remoteDeployJSON is what `astro remote deploy --output json` publishes: the
-// client image it pushed, which is what the agents' Helm values then name.
+// agent image it pushed, which is what the agents' Helm values then name.
 type remoteDeployJSON struct {
 	Image    string `json:"image"`
 	Registry string `json:"registry"`
@@ -31,11 +31,11 @@ type remoteDeployJSON struct {
 
 type remoteRuntimeCheckJSON struct {
 	Deployment               string `json:"deployment"`
-	ClientRuntimeVersion     string `json:"client_runtime_version"`
+	AgentRuntimeVersion      string `json:"agent_runtime_version"`
 	DeploymentRuntimeVersion string `json:"deployment_runtime_version"`
 }
 
-func newRemoteDeployJSON(res *astrodeploy.ClientDeploy) remoteDeployJSON {
+func newRemoteDeployJSON(res *astrodeploy.AgentDeploy) remoteDeployJSON {
 	obj := remoteDeployJSON{
 		Image:       res.Image,
 		Registry:    res.Registry,
@@ -46,24 +46,19 @@ func newRemoteDeployJSON(res *astrodeploy.ClientDeploy) remoteDeployJSON {
 	if c := res.RuntimeCheck; c != nil {
 		obj.RuntimeCheck = &remoteRuntimeCheckJSON{
 			Deployment:               c.DeploymentID,
-			ClientRuntimeVersion:     c.ClientRuntimeVersion,
+			AgentRuntimeVersion:      c.AgentRuntimeVersion,
 			DeploymentRuntimeVersion: c.DeploymentRuntimeVersion,
 		}
 	}
 	return obj
 }
 
-// renderRemoteDeploy is the text a finished client image push has always
+// renderRemoteDeploy is the text a finished agent image push has always
 // printed: where it went, and what to do with it next.
 func renderRemoteDeploy(image string) func(io.Writer) error {
 	return cliout.Text(func(b *bufio.Writer) {
-		fmt.Fprintf(b, "Pushed client image to %s\n", ansi.Bold(image))
-		fmt.Fprintf(b, "\n--------------------------------\n")
-		fmt.Fprintln(b, "The client image is in your private registry.")
-		fmt.Fprintln(b, "Next, update the agent component to use the new client image.")
-		fmt.Fprintln(b, "Update the helm chart values.yaml or your CI/CD pipeline to use it.")
-		fmt.Fprintf(b, "If you are using Astronomer provided Agent Helm chart, you would need to update the image field for each of the workers, dagProcessor, and triggerer component sections to the new image: %s\n", image)
-		fmt.Fprintln(b, "Once you have updated the helm chart values.yaml file, you can run 'helm upgrade' or update via your CI/CD pipeline to update the agent components")
+		fmt.Fprintf(b, "Pushed agent image to %s\n", ansi.Bold(image))
+		fmt.Fprintf(b, "Next, set image: in your agent Helm chart's values.yaml to %s and run helm upgrade, or have your CI/CD pipeline do it.\n", image)
 	})
 }
 

@@ -1188,8 +1188,8 @@ url = "https://deployments.astro.corp.example/ckdep-apc/airflow"
 	{
 		// Only an Astro Deployment runs remote agents, which pull the client
 		// image astro remote deploy pushes.
-		name:      "client-registry on an mwaa link",
-		wantCodes: []ProblemCode{CodeClientRegistryOnNonAstroLink},
+		name:      "agent-registry on an mwaa link",
+		wantCodes: []ProblemCode{CodeAgentRegistryOnNonAstroLink},
 		content: `
 [project]
 name = "p"
@@ -1200,9 +1200,9 @@ dependencies = ["apache-airflow==3.1.*"]
 [tool.astro.deployments.aws]
 target = "mwaa"
 environment = "orders-prod"
-client-registry = "quay.io/acme/client"
+agent-registry = "quay.io/acme/client"
 `,
-		wantKeys: []string{"tool.astro.deployments.aws.client-registry"},
+		wantKeys: []string{"tool.astro.deployments.aws.agent-registry"},
 	},
 	{
 		// Only an Astro Deployment has named Dag bundles for a deploy to

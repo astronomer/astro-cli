@@ -159,7 +159,7 @@ var publishedPayloads = []cliouttest.Case{
 	// removed.
 	{Name: "deploy-bundle", Value: bundleDeployJSON{}},
 	{Name: "deploy-bundle-delete", Value: bundleDeleteJSON{}},
-	// astro remote deploy: the client image it pushed.
+	// astro remote deploy: the agent image it pushed.
 	{Name: "remote-deploy", Value: remoteDeployJSON{}},
 
 	// astro deployment inspect -o json. Its keys predate the CLI's json rules

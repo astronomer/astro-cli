@@ -160,13 +160,13 @@ var (
 	}
 )
 
-// clientDeployProject is a project with a Dockerfile.client FROM the agent
+// agentDeployProject is a project with a Dockerfile.client FROM the agent
 // base and its client dependency files, in the cloud test config with a
 // logged-in context, pushing to registry.
 //
 // The registry is the one the command resolved, which the tests below pass
-// in their InputClientDeploy as testClientRegistry.
-func clientDeployProject(t *testing.T, token, registry string) string {
+// in their InputAgentDeploy as testAgentRegistry.
+func agentDeployProject(t *testing.T, token, registry string) string {
 	t.Helper()
 	dir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "Dockerfile.client"), []byte("FROM images.astronomer.cloud/baseimages/astro-remote-execution-agent:latest"), 0o600))
@@ -177,19 +177,19 @@ func clientDeployProject(t *testing.T, token, registry string) string {
 	require.NoError(t, err)
 	ctx.Token = token
 	require.NoError(t, ctx.SetContext())
-	testClientRegistry = registry
+	testAgentRegistry = registry
 	return dir
 }
 
-// testClientRegistry is the registry clientDeployProject last set up.
-var testClientRegistry string
+// testAgentRegistry is the registry agentDeployProject last set up.
+var testAgentRegistry string
 
-func TestDeployClientImage(t *testing.T) {
-	t.Run("successful client deploy", func(t *testing.T) {
-		dir := clientDeployProject(t, "test-token", "test-registry.io/acme/client-image")
-		cmd := withClientBuild(t, "docker")
+func TestDeployAgentImage(t *testing.T) {
+	t.Run("successful agent deploy", func(t *testing.T) {
+		dir := agentDeployProject(t, "test-token", "test-registry.io/acme/agent-image")
+		cmd := withAgentBuild(t, "docker")
 
-		got, err := DeployClientImage(InputClientDeploy{Registry: testClientRegistry, RegistrySource: "--registry", Path: dir}, nil)
+		got, err := DeployAgentImage(InputAgentDeploy{Registry: testAgentRegistry, RegistrySource: "--registry", Path: dir}, nil)
 		require.NoError(t, err)
 		// The base image registry is logged in to as the CLI user with the
 		// context's token on stdin, then the image is built under the
@@ -204,20 +204,20 @@ func TestDeployClientImage(t *testing.T) {
 	})
 
 	t.Run("no token, no login", func(t *testing.T) {
-		dir := clientDeployProject(t, "", "test-registry.io/acme/client-image")
-		cmd := withClientBuild(t, "docker")
+		dir := agentDeployProject(t, "", "test-registry.io/acme/agent-image")
+		cmd := withAgentBuild(t, "docker")
 
-		_, err := DeployClientImage(InputClientDeploy{Registry: testClientRegistry, RegistrySource: "--registry", Path: dir}, nil)
+		_, err := DeployAgentImage(InputAgentDeploy{Registry: testAgentRegistry, RegistrySource: "--registry", Path: dir}, nil)
 		require.NoError(t, err)
 		assert.False(t, hasImageCall(cmd.calls, " login "), "nothing to log in with: %v", cmd.calls)
 	})
 
 	t.Run("docker login failure", func(t *testing.T) {
-		clientDeployProject(t, "test-token", "test-registry.io/acme/client-image")
-		cmd := withClientBuild(t, "docker")
+		agentDeployProject(t, "test-token", "test-registry.io/acme/agent-image")
+		cmd := withAgentBuild(t, "docker")
 		cmd.errs = map[string]error{"login": errors.New("login failed")}
 
-		_, err := DeployClientImage(InputClientDeploy{Registry: testClientRegistry, RegistrySource: "--registry", Path: "/test/path"}, nil)
+		_, err := DeployAgentImage(InputAgentDeploy{Registry: testAgentRegistry, RegistrySource: "--registry", Path: "/test/path"}, nil)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "could not authenticate with registry images.astronomer.cloud")
 		assert.Contains(t, err.Error(), "login failed")
@@ -229,11 +229,11 @@ func TestDeployClientImage(t *testing.T) {
 	// the API is called, rather than reaching Docker as "invalid reference
 	// format" (#2223).
 	t.Run("a saved registry that carries a tag", func(t *testing.T) {
-		clientDeployProject(t, "test-token", "myregistry.example.com:7990/repository/path/my-image:1.0")
-		cmd := withClientBuild(t, "docker")
+		agentDeployProject(t, "test-token", "myregistry.example.com:7990/repository/path/my-image:1.0")
+		cmd := withAgentBuild(t, "docker")
 
 		// No API client: the registry is checked before anything calls the API.
-		_, err := DeployClientImage(InputClientDeploy{Registry: testClientRegistry, RegistrySource: "--registry", Path: "/test/path", DeploymentID: "test-deployment-id"}, nil)
+		_, err := DeployAgentImage(InputAgentDeploy{Registry: testAgentRegistry, RegistrySource: "--registry", Path: "/test/path", DeploymentID: "test-deployment-id"}, nil)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "--registry is not a usable registry endpoint")
 		assert.Contains(t, err.Error(), "must not include an image tag")
@@ -241,71 +241,71 @@ func TestDeployClientImage(t *testing.T) {
 	})
 
 	t.Run("missing registry configuration", func(t *testing.T) {
-		clientDeployProject(t, "test-token", "")
-		cmd := withClientBuild(t, "docker")
+		agentDeployProject(t, "test-token", "")
+		cmd := withAgentBuild(t, "docker")
 
-		_, err := DeployClientImage(InputClientDeploy{Registry: testClientRegistry, RegistrySource: "--registry", Path: "/test/path"}, nil)
+		_, err := DeployAgentImage(InputAgentDeploy{Registry: testAgentRegistry, RegistrySource: "--registry", Path: "/test/path"}, nil)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "no client registry to push to")
+		assert.Contains(t, err.Error(), "no agent registry to push to")
 		assert.Empty(t, cmd.calls, "no login, no build")
 	})
 
 	t.Run("no container engine", func(t *testing.T) {
-		dir := clientDeployProject(t, "test-token", "test-registry.io/acme/client-image")
-		cmd := withClientBuild(t, "docker")
+		dir := agentDeployProject(t, "test-token", "test-registry.io/acme/agent-image")
+		cmd := withAgentBuild(t, "docker")
 		resolveContainerEngine = func() (string, []string, error) { return "", nil, errors.New("no container engine found") }
 
-		_, err := DeployClientImage(InputClientDeploy{Registry: testClientRegistry, RegistrySource: "--registry", Path: dir}, nil)
+		_, err := DeployAgentImage(InputAgentDeploy{Registry: testAgentRegistry, RegistrySource: "--registry", Path: dir}, nil)
 		require.EqualError(t, err, "no container engine found")
 		assert.Empty(t, cmd.calls)
 	})
 
 	t.Run("build failure", func(t *testing.T) {
-		dir := clientDeployProject(t, "test-token", "test-registry.io/acme/client-image")
-		cmd := withClientBuild(t, "docker")
+		dir := agentDeployProject(t, "test-token", "test-registry.io/acme/agent-image")
+		cmd := withAgentBuild(t, "docker")
 		cmd.buildErr = errors.New("build failed")
 
-		_, err := DeployClientImage(InputClientDeploy{Registry: testClientRegistry, RegistrySource: "--registry", Path: dir}, nil)
+		_, err := DeployAgentImage(InputAgentDeploy{Registry: testAgentRegistry, RegistrySource: "--registry", Path: dir}, nil)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "could not build client image")
+		assert.Contains(t, err.Error(), "could not build agent image")
 		assert.False(t, hasImageCall(cmd.calls, " push "), "nothing is pushed: %v", cmd.calls)
 	})
 
 	t.Run("push failure", func(t *testing.T) {
-		dir := clientDeployProject(t, "test-token", "test-registry.io/acme/client-image")
-		cmd := withClientBuild(t, "docker")
+		dir := agentDeployProject(t, "test-token", "test-registry.io/acme/agent-image")
+		cmd := withAgentBuild(t, "docker")
 		cmd.errs = map[string]error{"push": errors.New("push failed")}
 
-		_, err := DeployClientImage(InputClientDeploy{Registry: testClientRegistry, RegistrySource: "--registry", Path: dir}, nil)
+		_, err := DeployAgentImage(InputAgentDeploy{Registry: testAgentRegistry, RegistrySource: "--registry", Path: dir}, nil)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "could not push client image")
+		assert.Contains(t, err.Error(), "could not push agent image")
 		assert.Contains(t, err.Error(), "push failed")
 	})
 
 	// A push the registry refuses says what to do about it, and still
 	// reports the 403.
 	t.Run("push forbidden", func(t *testing.T) {
-		dir := clientDeployProject(t, "test-token", "test-registry.io/acme/client-image")
-		cmd := withClientBuild(t, "docker")
+		dir := agentDeployProject(t, "test-token", "test-registry.io/acme/agent-image")
+		cmd := withAgentBuild(t, "docker")
 		cmd.errs = map[string]error{"push": errors.New("denied: 403 Forbidden")}
 
 		var err error
 		out := captureStderr(t, func() {
-			_, err = DeployClientImage(InputClientDeploy{Registry: testClientRegistry, RegistrySource: "--registry", Path: dir}, nil)
+			_, err = DeployAgentImage(InputAgentDeploy{Registry: testAgentRegistry, RegistrySource: "--registry", Path: dir}, nil)
 		})
 		require.ErrorIs(t, err, imagebuild.ErrPushForbidden)
-		assert.Contains(t, err.Error(), "could not push client image: failed to push image due to authentication error (403 Forbidden)")
-		assert.Contains(t, out, "Run docker login test-registry.io/acme/client-image, then try again")
+		assert.Contains(t, err.Error(), "could not push agent image: failed to push image due to authentication error (403 Forbidden)")
+		assert.Contains(t, out, "Run docker login test-registry.io/acme/agent-image, then try again")
 	})
 
 	t.Run("deploy with custom image name", func(t *testing.T) {
-		clientDeployProject(t, "test-token", "test-registry.io/acme/client-image")
-		cmd := withClientBuild(t, "docker")
+		agentDeployProject(t, "test-token", "test-registry.io/acme/agent-image")
+		cmd := withAgentBuild(t, "docker")
 
-		got, err := DeployClientImage(InputClientDeploy{Registry: testClientRegistry, RegistrySource: "--registry", Path: t.TempDir(), ImageName: "custom-image:tag"}, nil)
+		got, err := DeployAgentImage(InputAgentDeploy{Registry: testAgentRegistry, RegistrySource: "--registry", Path: t.TempDir(), ImageName: "custom-image:tag"}, nil)
 		require.NoError(t, err)
 		// The remote tag is timestamp-based, not the user's "tag".
-		assert.True(t, strings.HasPrefix(got.Image, "test-registry.io/acme/client-image:deploy-"), got.Image)
+		assert.True(t, strings.HasPrefix(got.Image, "test-registry.io/acme/agent-image:deploy-"), got.Image)
 		assert.Equal(t, []string{
 			"docker tag custom-image:tag " + got.Image,
 			"docker --version",
@@ -315,7 +315,7 @@ func TestDeployClientImage(t *testing.T) {
 	})
 }
 
-func TestPrepareClientBuildContext(t *testing.T) {
+func TestPrepareAgentBuildContext(t *testing.T) {
 	t.Run("creates build context with client files when they exist and have content", func(t *testing.T) {
 		// Setup temporary directory for testing
 		tempDir, err := os.MkdirTemp("", "test-client-deps-*")
@@ -337,13 +337,13 @@ func TestPrepareClientBuildContext(t *testing.T) {
 		assert.NoError(t, err)
 
 		// Prepare build context
-		buildContext, err := prepareClientBuildContext(tempDir)
+		buildContext, err := prepareAgentBuildContext(tempDir)
 		assert.NoError(t, err)
 		defer buildContext.CleanupFunc()
 
 		// Verify build context was created
 		assert.NotEqual(t, tempDir, buildContext.TempDir)
-		assert.Contains(t, buildContext.TempDir, "astro-client-build-")
+		assert.Contains(t, buildContext.TempDir, "astro-agent-build-")
 
 		// Verify that in the temp build directory, the client files are used as regular files
 		requirementsContent, err := os.ReadFile(filepath.Join(buildContext.TempDir, "requirements.txt"))
@@ -384,7 +384,7 @@ func TestPrepareClientBuildContext(t *testing.T) {
 		assert.NoError(t, err)
 
 		// Prepare build context
-		buildContext, err := prepareClientBuildContext(tempDir)
+		buildContext, err := prepareAgentBuildContext(tempDir)
 		assert.NoError(t, err)
 		defer buildContext.CleanupFunc()
 
@@ -419,7 +419,7 @@ func TestPrepareClientBuildContext(t *testing.T) {
 		assert.NoError(t, err)
 
 		// Prepare build context should error since client files don't exist
-		buildContext, err := prepareClientBuildContext(tempDir)
+		buildContext, err := prepareAgentBuildContext(tempDir)
 		assert.Error(t, err)
 		assert.NotNil(t, buildContext) // Now returns buildContext even on error (for cleanup)
 		assert.Contains(t, err.Error(), "could not set up client dependency files")
@@ -435,7 +435,7 @@ func TestPrepareClientBuildContext(t *testing.T) {
 
 		nonExistentDir := filepath.Join(tempDir, "nonexistent")
 
-		buildContext, err2 := prepareClientBuildContext(nonExistentDir)
+		buildContext, err2 := prepareAgentBuildContext(nonExistentDir)
 		assert.Error(t, err2)
 		assert.NotNil(t, buildContext) // Now returns buildContext even on error (for cleanup)
 		assert.Contains(t, err2.Error(), "source directory does not exist")
@@ -463,7 +463,7 @@ func TestPrepareClientBuildContext(t *testing.T) {
 		assert.NoError(t, err)
 
 		// Prepare build context should error since packages-client.txt doesn't exist
-		buildContext, err := prepareClientBuildContext(tempDir)
+		buildContext, err := prepareAgentBuildContext(tempDir)
 		assert.Error(t, err)
 		assert.NotNil(t, buildContext) // Now returns buildContext even on error (for cleanup)
 		assert.Contains(t, err.Error(), "could not set up client dependency files")
@@ -510,7 +510,7 @@ func TestPrepareClientBuildContext(t *testing.T) {
 		assert.NoError(t, os.Symlink(cacheDir, filepath.Join(linkDir, "darwin_arm64")))
 
 		// Previously failed with "is a directory"; now succeeds.
-		buildContext, err := prepareClientBuildContext(tempDir)
+		buildContext, err := prepareAgentBuildContext(tempDir)
 		assert.NotNil(t, buildContext)
 		defer buildContext.CleanupFunc()
 		assert.NoError(t, err)
@@ -540,7 +540,7 @@ func TestPrepareClientBuildContext(t *testing.T) {
 		assert.NoError(t, os.MkdirAll(target, 0o755))
 		assert.NoError(t, os.Symlink(target, filepath.Join(tempDir, "link-to-dir")))
 
-		buildContext, err := prepareClientBuildContext(tempDir)
+		buildContext, err := prepareAgentBuildContext(tempDir)
 		assert.NotNil(t, buildContext)
 		defer buildContext.CleanupFunc()
 		assert.NoError(t, err)
@@ -776,22 +776,22 @@ func TestExtractRuntimeVersionFromImage(t *testing.T) {
 	}
 }
 
-func TestValidateClientImageRuntimeVersion(t *testing.T) {
+func TestValidateAgentImageRuntimeVersion(t *testing.T) {
 	// Create a temporary directory for test files
-	tempDir, err := os.MkdirTemp("", "test-validate-client-image")
+	tempDir, err := os.MkdirTemp("", "test-validate-agent-image")
 	assert.NoError(t, err)
 	defer os.RemoveAll(tempDir)
 
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 	t.Run("skip validation when no deployment ID", func(t *testing.T) {
-		deployInput := InputClientDeploy{
-			Registry: testClientRegistry, RegistrySource: "--registry",
+		deployInput := InputAgentDeploy{
+			Registry: testAgentRegistry, RegistrySource: "--registry",
 			Path: tempDir,
 		}
 
 		// Should not error when deployment ID is empty
-		_, err := validateClientImageRuntimeVersion(deployInput, nil)
+		_, err := validateAgentImageRuntimeVersion(deployInput, nil)
 		assert.NoError(t, err)
 	})
 
@@ -800,15 +800,15 @@ func TestValidateClientImageRuntimeVersion(t *testing.T) {
 		err := config.ResetCurrentContext()
 		assert.NoError(t, err)
 
-		deployInput := InputClientDeploy{
-			Registry: testClientRegistry, RegistrySource: "--registry",
+		deployInput := InputAgentDeploy{
+			Registry: testAgentRegistry, RegistrySource: "--registry",
 			Path:         tempDir,
 			DeploymentID: "test-deployment-id",
 		}
 
 		mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
 
-		_, err = validateClientImageRuntimeVersion(deployInput, mockV1Client)
+		_, err = validateAgentImageRuntimeVersion(deployInput, mockV1Client)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "could not get current context")
 	})
@@ -816,8 +816,8 @@ func TestValidateClientImageRuntimeVersion(t *testing.T) {
 	t.Run("error when getting deployment information fails", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 
-		deployInput := InputClientDeploy{
-			Registry: testClientRegistry, RegistrySource: "--registry",
+		deployInput := InputAgentDeploy{
+			Registry: testAgentRegistry, RegistrySource: "--registry",
 			Path:         tempDir,
 			DeploymentID: "test-deployment-id",
 		}
@@ -830,7 +830,7 @@ func TestValidateClientImageRuntimeVersion(t *testing.T) {
 				HTTPResponse: &http.Response{StatusCode: 500},
 			}, nil)
 
-		_, err := validateClientImageRuntimeVersion(deployInput, mockV1Client)
+		_, err := validateAgentImageRuntimeVersion(deployInput, mockV1Client)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "could not get Deployment information")
 	})
@@ -838,8 +838,8 @@ func TestValidateClientImageRuntimeVersion(t *testing.T) {
 	t.Run("error when Dockerfile.client doesn't exist", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 
-		deployInput := InputClientDeploy{
-			Registry: testClientRegistry, RegistrySource: "--registry",
+		deployInput := InputAgentDeploy{
+			Registry: testAgentRegistry, RegistrySource: "--registry",
 			Path:         tempDir,
 			DeploymentID: "test-deployment-id",
 		}
@@ -860,9 +860,9 @@ func TestValidateClientImageRuntimeVersion(t *testing.T) {
 				},
 			}, nil)
 
-		_, err := validateClientImageRuntimeVersion(deployInput, mockV1Client)
+		_, err := validateAgentImageRuntimeVersion(deployInput, mockV1Client)
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "Dockerfile.client is required for client image runtime version validation")
+		assert.Contains(t, err.Error(), "Dockerfile.client is required for agent image runtime version validation")
 	})
 
 	t.Run("error when Dockerfile.client exists but fails to parse", func(t *testing.T) {
@@ -875,8 +875,8 @@ func TestValidateClientImageRuntimeVersion(t *testing.T) {
 		err := os.WriteFile(dockerfilePath, []byte(malformedDockerfile), 0o644)
 		assert.NoError(t, err)
 
-		deployInput := InputClientDeploy{
-			Registry: testClientRegistry, RegistrySource: "--registry",
+		deployInput := InputAgentDeploy{
+			Registry: testAgentRegistry, RegistrySource: "--registry",
 			Path:         tempDir,
 			DeploymentID: "test-deployment-id",
 		}
@@ -897,7 +897,7 @@ func TestValidateClientImageRuntimeVersion(t *testing.T) {
 				},
 			}, nil)
 
-		_, err = validateClientImageRuntimeVersion(deployInput, mockV1Client)
+		_, err = validateAgentImageRuntimeVersion(deployInput, mockV1Client)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "could not parse Dockerfile.client")
 	})
@@ -910,8 +910,8 @@ func TestValidateClientImageRuntimeVersion(t *testing.T) {
 		err := os.WriteFile(dockerfilePath, []byte("RUN echo 'test'\nCOPY . .\n"), 0o644)
 		assert.NoError(t, err)
 
-		deployInput := InputClientDeploy{
-			Registry: testClientRegistry, RegistrySource: "--registry",
+		deployInput := InputAgentDeploy{
+			Registry: testAgentRegistry, RegistrySource: "--registry",
 			Path:         tempDir,
 			DeploymentID: "test-deployment-id",
 		}
@@ -932,7 +932,7 @@ func TestValidateClientImageRuntimeVersion(t *testing.T) {
 				},
 			}, nil)
 
-		_, err = validateClientImageRuntimeVersion(deployInput, mockV1Client)
+		_, err = validateAgentImageRuntimeVersion(deployInput, mockV1Client)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "no base image found in Dockerfile.client")
 	})
@@ -946,8 +946,8 @@ func TestValidateClientImageRuntimeVersion(t *testing.T) {
 		err := os.WriteFile(dockerfilePath, []byte(dockerContent), 0o644)
 		assert.NoError(t, err)
 
-		deployInput := InputClientDeploy{
-			Registry: testClientRegistry, RegistrySource: "--registry",
+		deployInput := InputAgentDeploy{
+			Registry: testAgentRegistry, RegistrySource: "--registry",
 			Path:         tempDir,
 			DeploymentID: "test-deployment-id",
 		}
@@ -969,12 +969,12 @@ func TestValidateClientImageRuntimeVersion(t *testing.T) {
 			}, nil)
 
 		// Should error when version extraction fails
-		_, err = validateClientImageRuntimeVersion(deployInput, mockV1Client)
+		_, err = validateAgentImageRuntimeVersion(deployInput, mockV1Client)
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "could not extract runtime version from client image")
+		assert.Contains(t, err.Error(), "could not extract runtime version from agent image")
 	})
 
-	t.Run("error when client runtime version is newer than deployment version", func(t *testing.T) {
+	t.Run("error when agent runtime version is newer than deployment version", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 
 		// Create a Dockerfile.client with newer runtime version
@@ -983,8 +983,8 @@ func TestValidateClientImageRuntimeVersion(t *testing.T) {
 		err := os.WriteFile(dockerfilePath, []byte(dockerContent), 0o644)
 		assert.NoError(t, err)
 
-		deployInput := InputClientDeploy{
-			Registry: testClientRegistry, RegistrySource: "--registry",
+		deployInput := InputAgentDeploy{
+			Registry: testAgentRegistry, RegistrySource: "--registry",
 			Path:         tempDir,
 			DeploymentID: "test-deployment-id",
 		}
@@ -1005,14 +1005,14 @@ func TestValidateClientImageRuntimeVersion(t *testing.T) {
 				},
 			}, nil)
 
-		_, err = validateClientImageRuntimeVersion(deployInput, mockV1Client)
+		_, err = validateAgentImageRuntimeVersion(deployInput, mockV1Client)
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "client image runtime version validation failed")
+		assert.Contains(t, err.Error(), "agent image runtime version validation failed")
 		assert.Contains(t, err.Error(), "4.0-1")
 		assert.Contains(t, err.Error(), "3.0.0")
 	})
 
-	t.Run("success when client runtime version is compatible with deployment version", func(t *testing.T) {
+	t.Run("success when agent runtime version is compatible with deployment version", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 
 		// Create a Dockerfile.client with compatible runtime version
@@ -1021,8 +1021,8 @@ func TestValidateClientImageRuntimeVersion(t *testing.T) {
 		err := os.WriteFile(dockerfilePath, []byte(dockerContent), 0o644)
 		assert.NoError(t, err)
 
-		deployInput := InputClientDeploy{
-			Registry: testClientRegistry, RegistrySource: "--registry",
+		deployInput := InputAgentDeploy{
+			Registry: testAgentRegistry, RegistrySource: "--registry",
 			Path:         tempDir,
 			DeploymentID: "test-deployment-id",
 		}
@@ -1043,12 +1043,12 @@ func TestValidateClientImageRuntimeVersion(t *testing.T) {
 				},
 			}, nil)
 
-		check, err := validateClientImageRuntimeVersion(deployInput, mockV1Client)
+		check, err := validateAgentImageRuntimeVersion(deployInput, mockV1Client)
 		assert.NoError(t, err)
-		assert.Equal(t, &ClientRuntimeCheck{DeploymentID: "test-deployment-id", ClientRuntimeVersion: "3.0-5", DeploymentRuntimeVersion: "3.0-7"}, check)
+		assert.Equal(t, &AgentRuntimeCheck{DeploymentID: "test-deployment-id", AgentRuntimeVersion: "3.0-5", DeploymentRuntimeVersion: "3.0-7"}, check)
 	})
 
-	t.Run("success when client runtime version equals deployment version", func(t *testing.T) {
+	t.Run("success when agent runtime version equals deployment version", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 
 		// Create a Dockerfile.client with same runtime version
@@ -1057,8 +1057,8 @@ func TestValidateClientImageRuntimeVersion(t *testing.T) {
 		err := os.WriteFile(dockerfilePath, []byte(dockerContent), 0o644)
 		assert.NoError(t, err)
 
-		deployInput := InputClientDeploy{
-			Registry: testClientRegistry, RegistrySource: "--registry",
+		deployInput := InputAgentDeploy{
+			Registry: testAgentRegistry, RegistrySource: "--registry",
 			Path:         tempDir,
 			DeploymentID: "test-deployment-id",
 		}
@@ -1079,7 +1079,7 @@ func TestValidateClientImageRuntimeVersion(t *testing.T) {
 				},
 			}, nil)
 
-		_, err = validateClientImageRuntimeVersion(deployInput, mockV1Client)
+		_, err = validateAgentImageRuntimeVersion(deployInput, mockV1Client)
 		assert.NoError(t, err)
 	})
 }

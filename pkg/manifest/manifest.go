@@ -310,13 +310,13 @@ type Astro struct {
 // why they are here and not CLI settings: a CI runner and every teammate
 // read the same values.
 type Deploy struct {
-	// ClientRegistry is client-registry, the image repository
+	// AgentRegistry is agent-registry, the image repository
 	// (registry[:port]/repository, no tag) `astro remote deploy` pushes the
-	// Remote Execution client image to: the one the project's remote agents
-	// pull from. Empty if unset. A link's own client-registry overrides it for
-	// that link's Deployment (Link.ClientRegistry). Only its shape as a string
+	// Remote Execution agent image to: the one the project's remote agents
+	// pull from. Empty if unset. A link's own agent-registry overrides it for
+	// that link's Deployment (Link.AgentRegistry). Only its shape as a string
 	// is checked here; the deploy checks it is a repository it can push to.
-	ClientRegistry string
+	AgentRegistry string
 	// CosmosBoost is cosmos-boost, whether a deploy that uploads the project's
 	// Dags generates Cosmos Boost files for the dbt projects among them into
 	// the upload. False unless set.
@@ -364,11 +364,11 @@ type Link struct {
 	// Auth is how the CLI proves itself to this link's Airflow, with Method
 	// already resolved from the link's own auth table or its kind's default.
 	Auth Auth
-	// ClientRegistry is the repository `astro remote deploy` pushes this
-	// link's Remote Execution client image to: the link's own client-registry,
-	// else [tool.astro.deploy] client-registry. Set on astro links only, the
+	// AgentRegistry is the repository `astro remote deploy` pushes this
+	// link's Remote Execution agent image to: the link's own agent-registry,
+	// else [tool.astro.deploy] agent-registry. Set on astro links only, the
 	// one kind with remote agents to pull it.
-	ClientRegistry string
+	AgentRegistry string
 	// DagBundle is the named Dag bundle on this link's Deployment that
 	// `astro deploy` ships the project's Dags to, instead of the Deployment's
 	// default bundle. Set on astro links only, the one kind of Deployment with
@@ -615,10 +615,10 @@ const (
 	// it is refused rather than ignored: a link must not look like it names a
 	// host it is not reached on.
 	CodeDomainOnNonAPCLink ProblemCode = "domain_on_non_apc_link"
-	// CodeClientRegistryOnNonAstroLink is client-registry on a link that is
+	// CodeAgentRegistryOnNonAstroLink is agent-registry on a link that is
 	// not an astro link. Only an Astro Deployment runs remote agents, which
-	// pull the client image `astro remote deploy` pushes there.
-	CodeClientRegistryOnNonAstroLink ProblemCode = "client_registry_on_non_astro_link"
+	// pull the agent image `astro remote deploy` pushes there.
+	CodeAgentRegistryOnNonAstroLink ProblemCode = "agent_registry_on_non_astro_link"
 	// CodeDagBundleOnNonAstroLink is dag-bundle on a link that is not an
 	// astro link. Only an Astro Deployment has named Dag bundles for a deploy
 	// to target.
@@ -689,7 +689,7 @@ var problemCodes = []ProblemCode{
 	CodeWorkspaceOnNonAstroLink, CodeWorkspaceRequired, CodeMultipleDefaults,
 
 	CodeDomainRequired, CodeDomainOnNonAPCLink, CodeEnvironmentOnAPCLink, CodeURLOnAPCLink,
-	CodeClientRegistryOnNonAstroLink, CodeDagBundleOnNonAstroLink,
+	CodeAgentRegistryOnNonAstroLink, CodeDagBundleOnNonAstroLink,
 
 	CodeURLInvalid, CodeURLNoScheme, CodeURLNotHTTP, CodeURLNoHost,
 	CodeURLHasCredentials,
@@ -952,8 +952,8 @@ const astroRoot = "tool.astro"
 // else in silence, while a key a newer reader defines must not stop this one.
 var (
 	astroKeys  = []string{"airflow", "build-secrets", "deploy", "deployments", "dockerfile", "domain", "env", "organization", "packages", "pools", "runtime", "target", "targets", "workspace"}
-	linkKeys   = []string{"auth", "client-registry", "dag-bundle", "default", "deployment", "domain", "environment", "target", "url", "workspace"}
-	deployKeys = []string{"client-registry", "cosmos-boost", "git-metadata", "sha-as-tag"}
+	linkKeys   = []string{"auth", "agent-registry", "dag-bundle", "default", "deployment", "domain", "environment", "target", "url", "workspace"}
+	deployKeys = []string{"agent-registry", "cosmos-boost", "git-metadata", "sha-as-tag"}
 )
 
 // ReservedLinkName is the word that means the Airflow running on this machine
@@ -1286,7 +1286,7 @@ func (p *parser) link(key string, table map[string]any, a *Astro) Link {
 	link.Domain = p.domain(key, kind, table["domain"])
 	link.Workspace = p.workspace(key, kind, table["workspace"], a.Workspace)
 	link.Auth = p.auth(key+".auth", table["auth"], kind)
-	link.ClientRegistry = p.linkClientRegistry(key, kind, table["client-registry"], a.Deploy.ClientRegistry)
+	link.AgentRegistry = p.linkAgentRegistry(key, kind, table["agent-registry"], a.Deploy.AgentRegistry)
 	link.DagBundle = p.linkDagBundle(key, kind, table["dag-bundle"])
 	if link.Auth.Method == AuthAPC && kind != KindAPC {
 		p.add(CodeAuthAPCOnNonAPCLink, key+".auth.method", fmt.Sprintf("the apc method reads the Astro Private Cloud login for an apc link's domain; this is %s link", KindWithArticle(kind)))
@@ -1466,7 +1466,7 @@ func (p *parser) deploy(v any) Deploy {
 		return d
 	}
 	p.unknownKeys(key, table, deployKeys)
-	d.ClientRegistry = strings.TrimSpace(p.str(key+".client-registry", table["client-registry"]))
+	d.AgentRegistry = strings.TrimSpace(p.str(key+".agent-registry", table["agent-registry"]))
 	if raw, ok := table["git-metadata"]; ok {
 		d.GitMetadata = p.boolean(key+".git-metadata", raw)
 	}
@@ -1475,23 +1475,23 @@ func (p *parser) deploy(v any) Deploy {
 	return d
 }
 
-// linkClientRegistry is a link's client registry: its own client-registry,
+// linkAgentRegistry is a link's agent registry: its own agent-registry,
 // else fallback, the project's. Only an astro link has one; the key on any
 // other kind is a problem, and the project's value does not reach it.
-func (p *parser) linkClientRegistry(key string, kind LinkKind, raw any, fallback string) string {
+func (p *parser) linkAgentRegistry(key string, kind LinkKind, raw any, fallback string) string {
 	if kind != KindAstro {
 		if raw != nil {
-			p.add(CodeClientRegistryOnNonAstroLink, key+".client-registry",
-				fmt.Sprintf("only an astro link's Deployment runs remote agents that pull a client image, and this is %s link", KindWithArticle(kind)))
+			p.add(CodeAgentRegistryOnNonAstroLink, key+".agent-registry",
+				fmt.Sprintf("only an astro link's Deployment runs Remote Execution agents, and this is %s link", KindWithArticle(kind)))
 		}
 		return ""
 	}
-	return firstNonEmpty(strings.TrimSpace(p.str(key+".client-registry", raw)), fallback)
+	return firstNonEmpty(strings.TrimSpace(p.str(key+".agent-registry", raw)), fallback)
 }
 
 // linkDagBundle is a link's dag-bundle: the named Dag bundle its deploys ship
 // the project's Dags to. Only an astro link has one; the key on any other
-// kind is a problem. Unlike client-registry there is no project-wide value to
+// kind is a problem. Unlike agent-registry there is no project-wide value to
 // fall back to, as a bundle belongs to one Deployment.
 func (p *parser) linkDagBundle(key string, kind LinkKind, raw any) string {
 	if kind != KindAstro {
@@ -1515,8 +1515,8 @@ func (p *parser) linkDagBundle(key string, kind LinkKind, raw any) string {
 // with the load going on without it, otherwise.
 //
 // A near-miss is a typo (nearMiss says how near). `defalt = true` on a link,
-// or `client_registry`
-// for client-registry, decodes to nothing, so the setting the author meant
+// or `agent_registry`
+// for agent-registry, decodes to nothing, so the setting the author meant
 // silently does not apply; it is refused, naming the key it was meant to be.
 //
 // Any other unknown key is a warning, so a project stays readable by an older

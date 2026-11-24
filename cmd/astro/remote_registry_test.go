@@ -16,18 +16,18 @@ func registryManifest(t *testing.T, astro string) *manifest.Manifest {
 	return m
 }
 
-// --registry, else the named link's client-registry, else the project's.
-func TestResolveClientTarget(t *testing.T) {
+// --registry, else the named link's agent-registry, else the project's.
+func TestResolveAgentTarget(t *testing.T) {
 	m := registryManifest(t, `
 [tool.astro.deploy]
-client-registry = 'quay.io/acme/client'
+agent-registry = 'quay.io/acme/client'
 
 [tool.astro.deployments.dev]
 deployment = 'dep-dev'
 
 [tool.astro.deployments.prod]
 deployment = 'dep-prod'
-client-registry = '123.dkr.ecr.us-east-1.amazonaws.com/acme-prod'
+agent-registry = '123.dkr.ecr.us-east-1.amazonaws.com/acme-prod'
 
 [tool.astro.deployments.aws]
 target = 'mwaa'
@@ -35,66 +35,66 @@ environment = 'orders'
 `)
 	for _, tc := range []struct {
 		name, registry, deployment string
-		want                       clientTarget
+		want                       agentTarget
 	}{
-		{"the project's", "", "", clientTarget{registry: "quay.io/acme/client", source: projectClientRegistry}},
+		{"the project's", "", "", agentTarget{registry: "quay.io/acme/client", source: projectAgentRegistry}},
 		{
 			"a link without its own takes the project's, and its Deployment", "", "dev",
-			clientTarget{registry: "quay.io/acme/client", source: projectClientRegistry, deploymentID: "dep-dev"},
+			agentTarget{registry: "quay.io/acme/client", source: projectAgentRegistry, deploymentID: "dep-dev"},
 		},
 		{
 			"a link's own", "", "prod",
-			clientTarget{registry: "123.dkr.ecr.us-east-1.amazonaws.com/acme-prod", source: "pyproject.toml [tool.astro.deployments.prod] client-registry", deploymentID: "dep-prod"},
+			agentTarget{registry: "123.dkr.ecr.us-east-1.amazonaws.com/acme-prod", source: "pyproject.toml [tool.astro.deployments.prod] agent-registry", deploymentID: "dep-prod"},
 		},
 		{
 			"--registry wins over both", "other.example.com/x", "prod",
-			clientTarget{registry: "other.example.com/x", source: "--registry", deploymentID: "dep-prod"},
+			agentTarget{registry: "other.example.com/x", source: "--registry", deploymentID: "dep-prod"},
 		},
 		{
 			"a linked Deployment named by its id takes its link's", "", "dep-prod",
-			clientTarget{registry: "123.dkr.ecr.us-east-1.amazonaws.com/acme-prod", source: "pyproject.toml [tool.astro.deployments.prod] client-registry", deploymentID: "dep-prod"},
+			agentTarget{registry: "123.dkr.ecr.us-east-1.amazonaws.com/acme-prod", source: "pyproject.toml [tool.astro.deployments.prod] agent-registry", deploymentID: "dep-prod"},
 		},
 		{
 			"a Deployment id that is no link is passed as it is", "", "clnotalink",
-			clientTarget{registry: "quay.io/acme/client", source: projectClientRegistry, deploymentID: "clnotalink"},
+			agentTarget{registry: "quay.io/acme/client", source: projectAgentRegistry, deploymentID: "clnotalink"},
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			got, err := resolveClientTarget(m, tc.registry, tc.deployment)
+			got, err := resolveAgentTarget(m, tc.registry, tc.deployment)
 			require.NoError(t, err)
 			assert.Equal(t, tc.want, got)
 		})
 	}
 
-	_, err := resolveClientTarget(m, "", "aws")
+	_, err := resolveAgentTarget(m, "", "aws")
 	assert.ErrorContains(t, err, "only an Astro Deployment runs remote agents")
 }
 
 // With no --deployment, the project's default link gives its registry, but
 // not its Deployment: a run that named none is not checked against one.
-func TestResolveClientTargetTakesTheDefaultLinksRegistry(t *testing.T) {
+func TestResolveAgentTargetTakesTheDefaultLinksRegistry(t *testing.T) {
 	m := registryManifest(t, `
 [tool.astro.deployments.prod]
 deployment = 'dep-prod'
 default = true
-client-registry = 'quay.io/acme/prod'
+agent-registry = 'quay.io/acme/prod'
 
 [tool.astro.deployments.dev]
 deployment = 'dep-dev'
 `)
-	got, err := resolveClientTarget(m, "", "")
+	got, err := resolveAgentTarget(m, "", "")
 	require.NoError(t, err)
-	assert.Equal(t, clientTarget{registry: "quay.io/acme/prod", source: "pyproject.toml [tool.astro.deployments.prod] client-registry"}, got)
+	assert.Equal(t, agentTarget{registry: "quay.io/acme/prod", source: "pyproject.toml [tool.astro.deployments.prod] agent-registry"}, got)
 }
 
-func TestResolveClientTargetWithNone(t *testing.T) {
-	_, err := resolveClientTarget(nil, "", "")
+func TestResolveAgentTargetWithNone(t *testing.T) {
+	_, err := resolveAgentTarget(nil, "", "")
 	assert.ErrorContains(t, err, "pass --registry <registry>/<repository>")
 
-	got, err := resolveClientTarget(nil, "quay.io/acme/client", "dep")
+	got, err := resolveAgentTarget(nil, "quay.io/acme/client", "dep")
 	require.NoError(t, err)
-	assert.Equal(t, clientTarget{registry: "quay.io/acme/client", source: "--registry", deploymentID: "dep"}, got)
+	assert.Equal(t, agentTarget{registry: "quay.io/acme/client", source: "--registry", deploymentID: "dep"}, got)
 
-	_, err = resolveClientTarget(registryManifest(t, ""), "", "")
-	assert.ErrorContains(t, err, "set client-registry under [tool.astro.deploy] in pyproject.toml")
+	_, err = resolveAgentTarget(registryManifest(t, ""), "", "")
+	assert.ErrorContains(t, err, "set agent-registry under [tool.astro.deploy] in pyproject.toml")
 }
