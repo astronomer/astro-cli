@@ -217,8 +217,8 @@ func UploadBundle(tarDirPath, bundlePath, uploadURL string, prependBaseDir bool,
 		}
 	}()
 
-	// Cosmos Boost pre-deploy step, opt-in via cosmos_boost.pre_deploy; with
-	// the setting off the deploy does not touch the tree at all. Cleanup runs
+	// Cosmos Boost pre-deploy step, on by default, disabled via
+	// cosmos_boost.pre_deploy=false; with the setting off the deploy does not touch the tree at all. Cleanup runs
 	// first and is fatal on failure (a stale artifact must not ship inside the
 	// bundle), while stamping is best-effort (a missing artifact is safe).
 	// Artifacts left by earlier enabled deploys are removed with

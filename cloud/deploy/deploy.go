@@ -751,8 +751,8 @@ func buildImage(path, currentVersion, deployImage, imageName, organizationID str
 		// Build our image
 		fmt.Println(composeImageBuildingPromptMsg)
 
-		// Cosmos Boost pre-deploy step, opt-in via cosmos_boost.pre_deploy;
-		// with the setting off the build does not touch the tree at all.
+		// Cosmos Boost pre-deploy step, on by default, disabled via
+		// cosmos_boost.pre_deploy=false; with the setting off the build does not touch the tree at all.
 		// Cleanup runs first and is fatal on failure (a stale artifact must
 		// not ship inside the image), while stamping is best-effort (a
 		// missing artifact is safe). Artifacts left by earlier enabled
